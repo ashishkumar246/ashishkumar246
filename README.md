@@ -29,16 +29,10 @@
 
 ---
 
-## 🔥 Streak
-<p align="center">
-  <img src="https://github-readme-streak-stats.herokuapp.com/?user=ashishkumar246&theme=radical"/>
-</p>
-
 ## ⚡ Current Focus
 - 📈 Backend scaling & clean architecture  
 - 🤖 AI + Process Automation  
 - ⚙️ Real-world problem solving apps  
-
 ---
 
 ## 📬 Connect With Me
