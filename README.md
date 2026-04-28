@@ -14,11 +14,21 @@
   <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github"/>
 </p>
 
+
 ## 🚀 Featured Projects
-- 🔹 **TrustGuard** → AI-based trust verification system for APIs  
-- 🔹 **fastapi-postgresql-crud-dashboard** → Full-stack Employee Management System with FastAPI,PostgreSQL, JWT Authentication, and Dashboard UI.
-- 🔹 **Weather & News Chatbot** → API-based real-time data system  
-- 🔹 **Portfolio Website** → Fully deployed personal brand  
+- 🔹 TrustGuard  
+  → AI-based trust verification system for APIs  
+
+- 🔹 fastapi-postgresql-crud-dashboard  
+  → Full-stack Employee Management System (FastAPI + PostgreSQL + JWT + Dashboard UI)  
+
+- 🔹 Weather & News Chatbot  
+  → API-based real-time data system  
+
+- 🔹 Portfolio Website  
+  → Fully deployed personal brand  
+
+ 
 
 
 ## 📊 GitHub Stats
