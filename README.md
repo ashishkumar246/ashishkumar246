@@ -16,7 +16,7 @@
 
 ## 🚀 Featured Projects
 - 🔹 **TrustGuard** → AI-based trust verification system for APIs  
-- 🔹 **fastapi-postgresql-crud-dashboard** → Full-stack Employee Management System with FastAPI,            PostgreSQL, JWT Authentication, and Dashboard UI.
+- 🔹 **fastapi-postgresql-crud-dashboard** → Full-stack Employee Management System with FastAPI,PostgreSQL, JWT Authentication, and Dashboard UI.
 - 🔹 **Weather & News Chatbot** → API-based real-time data system  
 - 🔹 **Portfolio Website** → Fully deployed personal brand  
 
