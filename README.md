@@ -2,7 +2,7 @@
 
 
 <p align="center">
-  <img src="https://media.giphy.com/media/qgQUggAC3Pfv687qPC/giphy.gif" width="100%" />
+  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExeDZ0cjB6N3ZyejJvdDhpamVsNmR3aG5hbWF5bjA1ZnQ3Z3ZtZ3hnMSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/scZPhLqaVOM1qG4lT9/giphy.gif" width="100%" />
 </p>
 <p align="center">
   <img src="https://readme-typing-svg.herokuapp.com?color=00FF00&size=22&center=true&vCenter=true&width=600&lines=Initializing+System...;Access+Granted+✔;FastAPI+Developer;AI+Enthusiast;Backend+Engineer;Building+Scalable+Systems" />
