@@ -1,7 +1,13 @@
 <h1 align="center">⚡ Ashish Kumar</h1>
-<h2 align="center">Visitor Count</h2>
 
 
+<p align="center">
+  <img src="https://komarev.com/ghpvc/?username=ashishkumar246&color=blue" />
+  <br/>
+  <img src="https://github-readme-stats.vercel.app/api?username=ashishkumar246&show_icons=true" />
+  <br/>
+  <img src="https://readme-typing-svg.herokuapp.com/?lines=FastAPI+Developer;AI+Enthusiast;Backend+Engineer" />
+</p>
 <p align="center">
   🌐 <a href="https://ashish-techfolio.vercel.app/">View Portfolio</a>
 </p>
