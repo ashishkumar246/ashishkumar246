@@ -1,5 +1,9 @@
 <h1 align="center">⚡ Ashish Kumar</h1>
+<h2 align="center">Visitor Count</h2>
 
+<p align="center">
+  <img src="https://count.getloli.com/get/@ashishkumar246" />
+</p>
 ![Visitors](https://komarev.com/ghpvc/?username=ashishkumar246&color=blue)
 <p align="center">
   🌐 <a href="https://ashish-techfolio.vercel.app/">View Portfolio</a>
