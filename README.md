@@ -1,6 +1,6 @@
 <h1 align="center">⚡ Ashish Kumar</h1>
 
-
+![Visitors](https://komarev.com/ghpvc/?username=your-username&color=blue)
 <p align="center">
   🌐 <a href="https://ashish-techfolio.vercel.app/">View Portfolio</a>
 </p>
