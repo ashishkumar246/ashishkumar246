@@ -1,10 +1,6 @@
 <img width="1000" height="300" alt="3806936e1c0b535ff338121d6e5765df" src="https://github.com/user-attachments/assets/169ff6cb-d634-464c-9d89-aa94a51c6e65" />
 <h1 align="center">⚡ Ashish Kumar</h1>
 
-
-<p align="center">
-  <img src="<img width="736" height="414" alt="videoframe_5329" src="https://github.com/user-attachments/assets/51e16e0d-636b-4a12-a1ed-0bda98077221" />
-" width="100%" />
 </p>
 <p align="center">
   <img src="https://readme-typing-svg.herokuapp.com?color=00FF00&size=22&center=true&vCenter=true&width=600&lines=Initializing+System...;Access+Granted+✔;FastAPI+Developer;AI+Enthusiast;Backend+Engineer;Building+Scalable+Systems" />
