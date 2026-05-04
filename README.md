@@ -5,6 +5,12 @@
 </p>
 
 <h1 align="center">⚡ Ashish Kumar</h1>
+
+<p align="center">
+📩 Open to Backend, Full Stack & AI roles <br>
+🌐 <a href="https://ashish-techfolio.vercel.app/">Portfolio</a> <br>
+💼 Building scalable APIs & AI-driven solutions — let’s connect
+</p>
 <!--
 <p align="center">
   <img src="https://readme-typing-svg.herokuapp.com?color=00FF00&size=22&center=true&vCenter=true&width=600&lines=Initializing+System...;Access+Granted+✔;FastAPI+Developer;AI+Enthusiast;Backend+Engineer;Building+Scalable+Systems" />
