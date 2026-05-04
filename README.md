@@ -2,7 +2,7 @@
 <h1 align="center">⚡ Ashish Kumar</h1>
 
 <p align="right">
-  <img src="https://komarev.com/ghpvc/?username=ashishkumar246&label=Views&color=00ff00&style=flat" />
+  <img src="https://komarev.com/ghpvc/?username=ashishkumar246&label=Views&color=8A6DFF&style=flat" />
 </p>
 
 <h1 align="center">⚡ Ashish Kumar</h1>
