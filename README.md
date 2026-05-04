@@ -8,8 +8,7 @@
 
 <p align="center">
 📩 Open to Backend, Full Stack & AI roles <br>
-🌐 <a href="https://ashish-techfolio.vercel.app/">Portfolio</a> <br>
-💼 Building scalable APIs & AI-driven solutions — let’s connect
+🌐 <a href="https://ashish-techfolio.vercel.app/">View Portfolio</a> <br>
 </p>
 <!--
 <p align="center">
