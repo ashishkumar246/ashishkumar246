@@ -1,12 +1,8 @@
 <img width="1000" height="300" alt="3806936e1c0b535ff338121d6e5765df" src="https://github.com/user-attachments/assets/169ff6cb-d634-464c-9d89-aa94a51c6e65" />
 <h1 align="center">⚡ Ashish Kumar</h1>
 
-<h3 align="center">👀 Visitor Count</h3>
-
-<h3 align="center">🔥 Visitors</h3>
-
 <p align="center">
-  <img src="https://count.getloli.com/get/@ashishkumar246?theme=rule34" />
+  <img src="https://komarev.com/ghpvc/?username=ashishkumar246&label=Profile%20Views&color=00ff00&style=for-the-badge" />
 </p>
 
 </p>
