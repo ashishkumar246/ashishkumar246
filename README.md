@@ -1,3 +1,4 @@
+<img width="1000" height="300" alt="3806936e1c0b535ff338121d6e5765df" src="https://github.com/user-attachments/assets/169ff6cb-d634-464c-9d89-aa94a51c6e65" />
 <h1 align="center">⚡ Ashish Kumar</h1>
 
 
