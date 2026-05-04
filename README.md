@@ -3,8 +3,10 @@
 
 <h3 align="center">👀 Visitor Count</h3>
 
+<h3 align="center">🔥 Visitors</h3>
+
 <p align="center">
-  <img src="https://komarev.com/ghpvc/?username=ashishkumar246&label=Profile%20Views&color=00ff00&style=for-the-badge" />
+  <img src="https://count.getloli.com/get/@ashishkumar246?theme=rule34" />
 </p>
 
 </p>
