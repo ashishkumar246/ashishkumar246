@@ -17,9 +17,7 @@
 -->
 
 
-<p align="center">
-  🌐 <a href="https://ashish-techfolio.vercel.app/">View Portfolio</a>
-</p>
+
 
 
 ## 🛠 Tech Stack
