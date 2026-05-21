@@ -28,6 +28,12 @@
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
 ![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)
+![GenAI](https://img.shields.io/badge/Generative_AI-FF6F00?style=for-the-badge&logo=openai&logoColor=white)
+![RAG](https://img.shields.io/badge/RAG-8A2BE2?style=for-the-badge&logo=semanticweb&logoColor=white)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-5A31F4?style=for-the-badge&logo=databricks&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)
+![Sentence Transformers](https://img.shields.io/badge/Sentence_Transformers-FF4B4B?style=for-the-badge)
+![Vector Search](https://img.shields.io/badge/Vector_Search-00C853?style=for-the-badge)
 
 
 ## 🚀 Featured Projects
