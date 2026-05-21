@@ -37,6 +37,10 @@
 
 
 ## 🚀 Featured Projects
+
+- 🔹 AskDocs AI  
+  → Production-style RAG system that allows users to upload PDFs and generate contextual answers using FastAPI, ChromaDB, Ollama, and vector search pipelines
+   
 - 🔹 TrustGuard  
   → AI-based trust verification system for APIs  
 
@@ -51,14 +55,6 @@
 
  
 
-
-
----
-
-## ⚡ Current Focus
-- 📈 Backend scaling & clean architecture  
-- 🤖 AI + Process Automation  
-- ⚙️ Real-world problem solving apps  
 ---
 
 ## 📬 Connect With Me
