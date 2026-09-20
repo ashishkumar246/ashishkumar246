@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-import base64, json, os, re, sys, time
+import base64, json, os, sys, time, hashlib
 from pathlib import Path
-from urllib.parse import quote
-
 import requests
 
 OPENSEA_SLUG = "yakkamon-590038504"
 CONTRACT = "0x6d1bc5247ca99d917d91ec52dbbb5ef6c2435107".lower()
 RONIN_RPC = os.getenv("RONIN_RPC", "https://api.roninchain.com/rpc")
 OUT = Path(__file__).with_name("mismatches.json")
-KEY_FILE = Path(__file__).with_name(".opensea_key")
+STATE_FILE = Path(__file__).with_name("scan_state.json")
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "yakkamon-mismatch-watcher/1.0"})
+SESSION.headers.update({"User-Agent": "yakkamon-mismatch-watcher/2.0"})
 TIMEOUT = 25
+RECHECK_AFTER = 6 * 60 * 60  # periodically recheck old verified tokens every 6h
 
 def _retry_after(resp, default=30):
     try:
@@ -21,34 +20,26 @@ def _retry_after(resp, default=30):
         return default
 
 def get_opensea_key():
+    # Preferred: add OPENSEA_API_KEY as a GitHub Actions secret.
     env_key = os.getenv("OPENSEA_API_KEY")
     if env_key:
         return env_key.strip()
 
-    if KEY_FILE.exists():
-        cached = KEY_FILE.read_text().strip()
-        if cached:
-            return cached
-
+    # Fallback: temporary free key. This can be rate-limited, so a repo secret is better.
     url = "https://api.opensea.io/api/v2/auth/keys"
     last = None
     for attempt in range(8):
         r = SESSION.post(url, timeout=TIMEOUT)
-        if r.status_code == 201:
+        if r.status_code in (200, 201):
             key = r.json().get("api_key")
-            if not key:
-                raise RuntimeError("OpenSea created a key but returned no api_key")
-            KEY_FILE.write_text(key)
-            try:
-                os.chmod(KEY_FILE, 0o600)
-            except Exception:
-                pass
-            return key
+            if key:
+                return key
+            raise RuntimeError("OpenSea returned no api_key")
         if r.status_code == 429:
-            wait = _retry_after(r, min(60 * (attempt + 1), 300))
-            print(f"OpenSea key creation rate-limited; waiting {wait}s", flush=True)
+            wait = _retry_after(r, min(30 * (attempt + 1), 180))
+            print(f"OpenSea key rate-limited; waiting {wait}s", flush=True)
             time.sleep(wait)
-            last = f"429 after waiting {wait}s"
+            last = f"429 after {wait}s"
             continue
         r.raise_for_status()
     raise RuntimeError(f"Could not obtain OpenSea API key: {last}")
@@ -60,11 +51,12 @@ def fetch_bad_egg_listings(api_key):
         "traits": json.dumps([{"traitType":"Status","value":"Bad Egg"}], separators=(",",":")),
         "limit": 200,
     }
-    rows = []
-    cursor = None
+    rows, cursor = [], None
     for _ in range(20):
         if cursor:
             params["next"] = cursor
+        elif "next" in params:
+            del params["next"]
         r = SESSION.get(url, headers=headers, params=params, timeout=TIMEOUT)
         r.raise_for_status()
         data = r.json()
@@ -85,7 +77,6 @@ def walk(obj):
             yield from walk(v)
 
 def extract_token_id(row):
-    # Prefer objects that explicitly identify our NFT contract.
     for d in walk(row):
         addr = str(d.get("contract") or d.get("contract_address") or d.get("token_address") or "").lower()
         if isinstance(d.get("contract"), dict):
@@ -95,7 +86,6 @@ def extract_token_id(row):
                 v = d.get(k)
                 if v is not None and str(v).isdigit():
                     return str(v)
-    # OpenSea collection listing responses commonly expose an NFT identifier.
     for d in walk(row):
         for k in ("token_id","tokenId","identifier"):
             v = d.get(k)
@@ -104,9 +94,7 @@ def extract_token_id(row):
     return None
 
 def extract_price(row):
-    symbol = None
-    decimals = None
-    raw = None
+    symbol, decimals, raw = None, None, None
     for d in walk(row):
         if symbol is None and isinstance(d.get("currency"), str):
             symbol = d.get("currency")
@@ -117,8 +105,7 @@ def extract_price(row):
         if raw is None:
             for k in ("value","current_price","currentPrice","startAmount","endAmount"):
                 v = d.get(k)
-                if isinstance(v, (int, float)) or (isinstance(v, str) and v.isdigit()):
-                    # Prefer realistically large integer amounts; avoid random IDs.
+                if isinstance(v, (int,float)) or (isinstance(v,str) and v.isdigit()):
                     if k in ("current_price","currentPrice","startAmount","endAmount") or (k=="value" and len(str(v)) >= 6):
                         raw = str(v)
                         break
@@ -126,39 +113,39 @@ def extract_price(row):
         return None
     try:
         n = int(raw)
-        if decimals is None:
-            decimals = 18
-        value = n / (10 ** decimals)
-        return {"value": value, "symbol": symbol or "RON", "raw": raw, "decimals": decimals}
+        decimals = 18 if decimals is None else decimals
+        return {"value": n/(10**decimals), "symbol": symbol or "RON", "raw": raw, "decimals": decimals}
     except Exception:
         return {"raw": raw, "symbol": symbol or "RON"}
 
+def listing_fingerprint(row):
+    # Tracks meaningful listing changes without persisting the entire OpenSea response.
+    price = extract_price(row)
+    payload = json.dumps(price, sort_keys=True, separators=(",",":"))
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
 def rpc_token_uri(token_id):
-    selector = "c87b56dd"  # tokenURI(uint256)
+    selector = "c87b56dd"
     arg = hex(int(token_id))[2:].rjust(64, "0")
     payload = {"jsonrpc":"2.0","id":1,"method":"eth_call",
                "params":[{"to":CONTRACT,"data":"0x"+selector+arg},"latest"]}
     last = None
-    for attempt in range(7):
+    for attempt in range(8):
         r = SESSION.post(RONIN_RPC, json=payload, timeout=TIMEOUT)
         if r.status_code == 429:
-            wait = _retry_after(r, min(2 ** attempt, 20))
+            wait = _retry_after(r, min(2 ** attempt, 30))
             time.sleep(wait)
             last = f"429 after {wait}s"
             continue
         r.raise_for_status()
         result = r.json().get("result")
-        break
-    else:
-        raise RuntimeError(f"Ronin RPC rate limit persisted: {last}")
-    if not result or result == "0x":
-        raise RuntimeError(f"empty tokenURI result for #{token_id}")
-    b = bytes.fromhex(result[2:])
-    if len(b) < 64:
-        raise RuntimeError("short ABI response")
-    offset = int.from_bytes(b[:32], "big")
-    length = int.from_bytes(b[offset:offset+32], "big")
-    return b[offset+32:offset+32+length].decode("utf-8")
+        if not result or result == "0x":
+            raise RuntimeError(f"empty tokenURI result for #{token_id}")
+        b = bytes.fromhex(result[2:])
+        offset = int.from_bytes(b[:32], "big")
+        length = int.from_bytes(b[offset:offset+32], "big")
+        return b[offset+32:offset+32+length].decode("utf-8")
+    raise RuntimeError(f"Ronin RPC rate limit persisted: {last}")
 
 def load_metadata(uri):
     if uri.startswith("data:application/json;base64,"):
@@ -184,7 +171,7 @@ def load_metadata(uri):
 def status_from_metadata(meta):
     attrs = meta.get("attributes") or meta.get("traits") or []
     if isinstance(attrs, dict):
-        attrs = [{"trait_type": k, "value": v} for k,v in attrs.items()]
+        attrs = [{"trait_type":k,"value":v} for k,v in attrs.items()]
     for a in attrs:
         if not isinstance(a, dict):
             continue
@@ -193,61 +180,129 @@ def status_from_metadata(meta):
             return str(a.get("value") or "").strip()
     return None
 
+def load_state():
+    try:
+        data = json.loads(STATE_FILE.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
 def main():
+    now = int(time.time())
+    state = load_state()
     api_key = get_opensea_key()
     listings = fetch_bad_egg_listings(api_key)
 
-    by_token = {}
-    unparsed = 0
+    by_token, unparsed = {}, 0
     for row in listings:
         tid = extract_token_id(row)
         if not tid:
             unparsed += 1
             continue
-        # Keep one listing per token; endpoint is price-sorted, so first is best.
         by_token.setdefault(tid, row)
 
-    mismatches = []
-    verification_errors = []
-    for i, (tid, row) in enumerate(sorted(by_token.items(), key=lambda x: int(x[0]))):
+    active_ids = set(by_token)
+    # Remove old state for NFTs no longer actively listed as Bad Egg on OpenSea.
+    state = {tid:rec for tid,rec in state.items() if tid in active_ids}
+
+    new_ids, changed_ids, retry_ids, stale_ids, skipped_ids = [], [], [], [], []
+    for tid, row in by_token.items():
+        fp = listing_fingerprint(row)
+        rec = state.get(tid)
+        if rec is None:
+            new_ids.append(tid)
+        elif rec.get("verification_ok") is not True:
+            retry_ids.append(tid)
+        elif rec.get("listing_fingerprint") != fp:
+            changed_ids.append(tid)
+        elif now - int(rec.get("last_checked",0)) >= RECHECK_AFTER:
+            stale_ids.append(tid)
+        else:
+            skipped_ids.append(tid)
+
+    # Priority: unfinished work first, then newly listed, listing changes, then 6h safety rechecks.
+    todo = retry_ids + new_ids + changed_ids + stale_ids
+    # De-duplicate while preserving priority.
+    todo = list(dict.fromkeys(todo))
+
+    errors = []
+    checked_this_run = 0
+    for tid in todo:
+        row = by_token[tid]
+        fp = listing_fingerprint(row)
         try:
             uri = rpc_token_uri(tid)
             meta = load_metadata(uri)
-            current_status = status_from_metadata(meta)
-            if (current_status or "").strip().lower() != "bad egg":
+            status = status_from_metadata(meta)
+            state[tid] = {
+                "verification_ok": True,
+                "last_checked": now,
+                "listing_fingerprint": fp,
+                "ronin_status": status,
+                "is_mismatch": (status or "").strip().lower() != "bad egg",
+                "price": extract_price(row),
+                "token_uri": uri,
+            }
+            checked_this_run += 1
+        except Exception as e:
+            prev = state.get(tid, {})
+            prev.update({
+                "verification_ok": False,
+                "last_attempt": now,
+                "listing_fingerprint": fp,
+                "error": str(e)[:300],
+            })
+            state[tid] = prev
+            errors.append({"token_id":tid,"error":str(e)[:300]})
+        time.sleep(0.35)
+
+    mismatches = []
+    verified_active = 0
+    for tid, row in by_token.items():
+        rec = state.get(tid, {})
+        if rec.get("verification_ok") is True:
+            verified_active += 1
+            if rec.get("is_mismatch") is True:
                 mismatches.append({
                     "token_id": tid,
                     "opensea_status": "Bad Egg",
-                    "ronin_live_metadata_status": current_status,
+                    "ronin_live_metadata_status": rec.get("ronin_status"),
                     "opensea_price": extract_price(row),
                     "opensea_url": f"https://opensea.io/item/ronin/{CONTRACT}/{tid}",
                     "ronin_url": f"https://marketplace.roninchain.com/collections/yakkamon/{tid}",
-                    "token_uri": uri,
                 })
-        except Exception as e:
-            verification_errors.append({"token_id": tid, "error": str(e)[:300]})
-        # Public Ronin RPC is rate-limited; pace calls so every token is verified.
-        time.sleep(0.35)
 
+    pending = sorted([tid for tid in active_ids if state.get(tid,{}).get("verification_ok") is not True], key=int)
     result = {
         "collection": "Yakkamon",
         "contract": CONTRACT,
-        "rule": "Active OpenSea listing is tagged Bad Egg, but live Ronin token metadata is not Bad Egg",
+        "rule": "Actively listed on OpenSea with Status=Bad Egg, but current Ronin-chain metadata is not Bad Egg",
         "opensea_bad_egg_active_listing_rows": len(listings),
-        "unique_tokens_checked": len(by_token),
+        "opensea_bad_egg_unique_active_tokens": len(by_token),
+        "verified_active_tokens": verified_active,
+        "verification_complete": verified_active == len(by_token),
+        "pending_verification_count": len(pending),
+        "pending_token_ids": pending[:100],
+        "checked_this_run": checked_this_run,
+        "new_tokens_found_this_run": len(new_ids),
+        "changed_listings_this_run": len(changed_ids),
+        "previously_verified_skipped_this_run": len(skipped_ids),
+        "periodic_rechecks_this_run": len(stale_ids),
+        "verification_error_count_this_run": len(errors),
+        "verification_errors_this_run": errors[:50],
         "unparsed_listing_rows": unparsed,
-        "verified_token_count": len(by_token) - len(verification_errors),
-        "verification_complete": len(verification_errors) == 0,
-        "verification_error_count": len(verification_errors),
-        "verification_errors": verification_errors[:50],
         "mismatch_count": len(mismatches),
-        "mismatches": mismatches,
+        "mismatches": sorted(mismatches, key=lambda x:int(x["token_id"])),
     }
-    text = json.dumps(result, indent=2, sort_keys=True) + "\n"
-    previous = OUT.read_text() if OUT.exists() else None
-    OUT.write_text(text)
-    print(text)
-    return 0 if previous == text else 2
+
+    state_text = json.dumps(state, indent=2, sort_keys=True) + "\n"
+    out_text = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    old_state = STATE_FILE.read_text() if STATE_FILE.exists() else None
+    old_out = OUT.read_text() if OUT.exists() else None
+    STATE_FILE.write_text(state_text)
+    OUT.write_text(out_text)
+    print(out_text)
+    return 2 if old_state != state_text or old_out != out_text else 0
 
 if __name__ == "__main__":
     sys.exit(main())
