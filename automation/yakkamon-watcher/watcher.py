@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import base64, json, os, sys, time, hashlib
+import base64, json, os, sys, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import requests
 
@@ -11,11 +12,13 @@ OUT = Path(__file__).with_name("mismatches.json")
 STATE_FILE = Path(__file__).with_name("baseline_state.json")
 
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "yakkamon-mismatch-watcher/3.0"})
-TIMEOUT = 25
-BASELINE_RECHECK_AFTER = 12 * 60 * 60  # refresh verified baseline status twice daily
+SESSION.headers.update({"User-Agent": "yakkamon-mismatch-watcher/4.0"})
+TIMEOUT = 30
+BASELINE_RECHECK_AFTER = 12 * 60 * 60
+RPC_BATCH_SIZE = 40
+METADATA_WORKERS = 10
 
-def _retry_after(resp, default=30):
+def _retry_after(resp, default=15):
     try:
         return max(1, int(float(resp.headers.get("Retry-After", default))))
     except Exception:
@@ -25,7 +28,6 @@ def get_opensea_key():
     env_key = os.getenv("OPENSEA_API_KEY")
     if env_key:
         return env_key.strip()
-
     url = "https://api.opensea.io/api/v2/auth/keys"
     last = None
     for attempt in range(8):
@@ -36,7 +38,7 @@ def get_opensea_key():
                 return key
             raise RuntimeError("OpenSea returned no api_key")
         if r.status_code == 429:
-            wait = _retry_after(r, min(30 * (attempt + 1), 180))
+            wait = _retry_after(r, min(15 * (attempt + 1), 90))
             print(f"OpenSea key rate-limited; waiting {wait}s", flush=True)
             time.sleep(wait)
             last = f"429 after {wait}s"
@@ -45,16 +47,14 @@ def get_opensea_key():
     raise RuntimeError(f"Could not obtain OpenSea API key: {last}")
 
 def _paged_get(url, headers, params, item_keys):
-    rows = []
-    cursor = None
+    rows, cursor = [], None
     for _ in range(50):
         q = dict(params)
         if cursor:
             q["next"] = cursor
         r = SESSION.get(url, headers=headers, params=q, timeout=TIMEOUT)
         if r.status_code == 429:
-            wait = _retry_after(r, 30)
-            time.sleep(wait)
+            time.sleep(_retry_after(r, 15))
             continue
         r.raise_for_status()
         data = r.json()
@@ -70,24 +70,28 @@ def _paged_get(url, headers, params, item_keys):
     return rows
 
 def fetch_all_opensea_bad_eggs(api_key):
-    # All OpenSea NFTs currently carrying Status=Bad Egg, listed or not.
     url = f"https://api.opensea.io/api/v2/collection/{OPENSEA_SLUG}/nfts"
-    headers = {"x-api-key": api_key}
-    params = {
-        "traits": json.dumps([{"traitType":"Status","value":"Bad Egg"}], separators=(",",":")),
-        "limit": 200,
-    }
-    return _paged_get(url, headers, params, ("nfts","items","results"))
+    return _paged_get(
+        url,
+        {"x-api-key": api_key},
+        {
+            "traits": json.dumps([{"traitType":"Status","value":"Bad Egg"}], separators=(",",":")),
+            "limit": 200,
+        },
+        ("nfts","items","results"),
+    )
 
 def fetch_active_bad_egg_listings(api_key):
-    # Lightweight recurring query. We only use it to see which baseline mismatches are for sale.
     url = f"https://api.opensea.io/api/v2/listings/collection/{OPENSEA_SLUG}/best"
-    headers = {"x-api-key": api_key}
-    params = {
-        "traits": json.dumps([{"traitType":"Status","value":"Bad Egg"}], separators=(",",":")),
-        "limit": 200,
-    }
-    return _paged_get(url, headers, params, ("listings","orders","results"))
+    return _paged_get(
+        url,
+        {"x-api-key": api_key},
+        {
+            "traits": json.dumps([{"traitType":"Status","value":"Bad Egg"}], separators=(",",":")),
+            "limit": 200,
+        },
+        ("listings","orders","results"),
+    )
 
 def walk(obj):
     if isinstance(obj, dict):
@@ -140,30 +144,77 @@ def extract_price(row):
     except Exception:
         return {"raw": raw, "symbol": symbol or "RON"}
 
-def rpc_token_uri(token_id):
+def _decode_abi_string(result):
+    if not result or result == "0x":
+        raise RuntimeError("empty tokenURI result")
+    b = bytes.fromhex(result[2:])
+    if len(b) < 64:
+        raise RuntimeError("short ABI tokenURI response")
+    offset = int.from_bytes(b[:32], "big")
+    length = int.from_bytes(b[offset:offset+32], "big")
+    return b[offset+32:offset+32+length].decode("utf-8")
+
+def rpc_token_uris_batch(token_ids):
+    """Resolve tokenURI for many token IDs using JSON-RPC batch calls."""
+    out, errors = {}, {}
     selector = "c87b56dd"
-    arg = hex(int(token_id))[2:].rjust(64, "0")
-    payload = {"jsonrpc":"2.0","id":1,"method":"eth_call",
-               "params":[{"to":CONTRACT,"data":"0x"+selector+arg},"latest"]}
-    last = None
-    for attempt in range(9):
-        r = SESSION.post(RONIN_RPC, json=payload, timeout=TIMEOUT)
-        if r.status_code == 429:
-            wait = _retry_after(r, min(2 ** attempt, 30))
-            time.sleep(wait)
-            last = f"429 after {wait}s"
+    for start in range(0, len(token_ids), RPC_BATCH_SIZE):
+        chunk = token_ids[start:start + RPC_BATCH_SIZE]
+        payload = []
+        id_to_tid = {}
+        for i, tid in enumerate(chunk, start=1):
+            arg = hex(int(tid))[2:].rjust(64, "0")
+            req_id = start + i
+            id_to_tid[req_id] = tid
+            payload.append({
+                "jsonrpc":"2.0",
+                "id":req_id,
+                "method":"eth_call",
+                "params":[{"to":CONTRACT,"data":"0x"+selector+arg},"latest"],
+            })
+
+        response = None
+        last = None
+        for attempt in range(7):
+            r = SESSION.post(RONIN_RPC, json=payload, timeout=TIMEOUT)
+            if r.status_code == 429:
+                wait = _retry_after(r, min(2 ** attempt, 20))
+                print(f"Ronin batch rate-limited; waiting {wait}s", flush=True)
+                time.sleep(wait)
+                last = f"429 after {wait}s"
+                continue
+            r.raise_for_status()
+            response = r.json()
+            break
+
+        if response is None:
+            for tid in chunk:
+                errors[tid] = f"Ronin RPC batch rate limit persisted: {last}"
             continue
-        r.raise_for_status()
-        result = r.json().get("result")
-        if not result or result == "0x":
-            raise RuntimeError(f"empty tokenURI result for #{token_id}")
-        b = bytes.fromhex(result[2:])
-        offset = int.from_bytes(b[:32], "big")
-        length = int.from_bytes(b[offset:offset+32], "big")
-        return b[offset+32:offset+32+length].decode("utf-8")
-    raise RuntimeError(f"Ronin RPC rate limit persisted: {last}")
+
+        if isinstance(response, dict):
+            response = [response]
+        seen = set()
+        for item in response:
+            tid = id_to_tid.get(item.get("id"))
+            if tid is None:
+                continue
+            seen.add(tid)
+            try:
+                if item.get("error"):
+                    raise RuntimeError(str(item["error"])[:250])
+                out[tid] = _decode_abi_string(item.get("result"))
+            except Exception as e:
+                errors[tid] = str(e)[:300]
+        for tid in chunk:
+            if tid not in seen:
+                errors[tid] = "missing response from Ronin batch RPC"
+        time.sleep(0.2)
+    return out, errors
 
 def load_metadata(uri):
+    s = requests.Session()
+    s.headers.update({"User-Agent": "yakkamon-mismatch-watcher/4.0"})
     if uri.startswith("data:application/json;base64,"):
         return json.loads(base64.b64decode(uri.split(",",1)[1]).decode())
     if uri.startswith("data:application/json,"):
@@ -176,7 +227,10 @@ def load_metadata(uri):
     last = None
     for url in urls:
         try:
-            r = SESSION.get(url, timeout=TIMEOUT)
+            r = s.get(url, timeout=TIMEOUT)
+            if r.status_code == 429:
+                time.sleep(_retry_after(r, 2))
+                r = s.get(url, timeout=TIMEOUT)
             r.raise_for_status()
             return r.json()
         except Exception as e:
@@ -206,17 +260,12 @@ def main():
     now = int(time.time())
     api_key = get_opensea_key()
 
-    # PHASE A: build/refresh the master OpenSea-Bad / Ronin-Good baseline.
+    # 1) Exact OpenSea Bad Egg token set (listed or not).
     all_bad_rows = fetch_all_opensea_bad_eggs(api_key)
-    os_bad_ids = []
-    for row in all_bad_rows:
-        tid = extract_token_id(row)
-        if tid:
-            os_bad_ids.append(tid)
-    os_bad_ids = sorted(set(os_bad_ids), key=int)
+    os_bad_ids = sorted({tid for row in all_bad_rows if (tid := extract_token_id(row))}, key=int)
+    os_bad_set = set(os_bad_ids)
 
-    state = load_state()
-    state = {tid:rec for tid,rec in state.items() if tid in set(os_bad_ids)}
+    state = {tid:rec for tid,rec in load_state().items() if tid in os_bad_set}
 
     retry_ids, new_ids, stale_ids, skipped_ids = [], [], [], []
     for tid in os_bad_ids:
@@ -230,53 +279,68 @@ def main():
         else:
             skipped_ids.append(tid)
 
-    # Finish incomplete baseline first, then new OpenSea Bad Eggs, then periodic safety refresh.
     todo = list(dict.fromkeys(retry_ids + new_ids + stale_ids))
     errors = []
     checked_this_run = 0
 
-    for tid in todo:
-        try:
-            uri = rpc_token_uri(tid)
-            meta = load_metadata(uri)
-            ronin_status = status_from_metadata(meta)
-            state[tid] = {
-                "verification_ok": True,
-                "last_checked": now,
-                "ronin_status": ronin_status,
-                "is_baseline_mismatch": (ronin_status or "").strip().lower() != "bad egg",
-                "token_uri": uri,
-            }
-            checked_this_run += 1
-        except Exception as e:
-            prev = state.get(tid, {})
-            prev.update({"verification_ok":False,"last_attempt":now,"error":str(e)[:300]})
-            state[tid] = prev
-            errors.append({"token_id":tid,"error":str(e)[:300]})
-        time.sleep(0.35)
+    # 2) Resolve Ronin tokenURIs in JSON-RPC batches (about 20 calls for ~900 eggs,
+    #    rather than ~900 individual RPC HTTP calls).
+    uris, rpc_errors = rpc_token_uris_batch(todo)
+
+    # 3) Fetch metadata concurrently. Each successful item immediately updates in-memory state.
+    def verify_one(tid):
+        uri = uris[tid]
+        meta = load_metadata(uri)
+        return tid, uri, status_from_metadata(meta)
+
+    with ThreadPoolExecutor(max_workers=METADATA_WORKERS) as pool:
+        futures = {pool.submit(verify_one, tid): tid for tid in uris}
+        for future in as_completed(futures):
+            tid = futures[future]
+            try:
+                _, uri, ronin_status = future.result()
+                state[tid] = {
+                    "verification_ok": True,
+                    "last_checked": now,
+                    "ronin_status": ronin_status,
+                    "is_baseline_mismatch": (ronin_status or "").strip().lower() != "bad egg",
+                    "token_uri": uri,
+                }
+                checked_this_run += 1
+            except Exception as e:
+                prev = state.get(tid,{})
+                prev.update({"verification_ok":False,"last_attempt":now,"error":str(e)[:300]})
+                state[tid] = prev
+                errors.append({"token_id":tid,"error":str(e)[:300]})
+
+    for tid, err in rpc_errors.items():
+        prev = state.get(tid,{})
+        prev.update({"verification_ok":False,"last_attempt":now,"error":err[:300]})
+        state[tid] = prev
+        errors.append({"token_id":tid,"error":err[:300]})
 
     baseline_mismatch_ids = sorted(
-        [tid for tid in os_bad_ids if state.get(tid,{}).get("verification_ok") is True
+        [tid for tid in os_bad_ids
+         if state.get(tid,{}).get("verification_ok") is True
          and state.get(tid,{}).get("is_baseline_mismatch") is True],
-        key=int
+        key=int,
     )
-    pending_baseline_ids = sorted(
+    pending_ids = sorted(
         [tid for tid in os_bad_ids if state.get(tid,{}).get("verification_ok") is not True],
-        key=int
+        key=int,
     )
-    verified_baseline_count = len(os_bad_ids) - len(pending_baseline_ids)
 
-    # PHASE B: recurring lightweight listing check.
+    # 4) Cheap recurring check: only intersect confirmed mismatch IDs with active listings.
     listing_rows = fetch_active_bad_egg_listings(api_key)
     listed_by_token = {}
     for row in listing_rows:
         tid = extract_token_id(row)
         if tid:
-            listed_by_token.setdefault(tid, row)
+            listed_by_token.setdefault(tid,row)
 
     listed_mismatches = []
-    baseline_set = set(baseline_mismatch_ids)
-    for tid in sorted(set(listed_by_token) & baseline_set, key=int):
+    mismatch_set = set(baseline_mismatch_ids)
+    for tid in sorted(set(listed_by_token) & mismatch_set, key=int):
         row = listed_by_token[tid]
         rec = state.get(tid,{})
         listed_mismatches.append({
@@ -291,12 +355,12 @@ def main():
     result = {
         "collection": "Yakkamon",
         "contract": CONTRACT,
-        "architecture": "Build all OpenSea-Bad/Ronin-Good baseline first; recurring scans only intersect that baseline with active OpenSea listings.",
+        "architecture": "OpenSea Bad-Egg set compared with batched Ronin live metadata; recurring alert is set intersection with active OpenSea listings.",
         "opensea_bad_egg_total_unique_tokens": len(os_bad_ids),
-        "baseline_verified_count": verified_baseline_count,
-        "baseline_verification_complete": len(pending_baseline_ids) == 0,
-        "baseline_pending_count": len(pending_baseline_ids),
-        "baseline_pending_token_ids": pending_baseline_ids[:200],
+        "baseline_verified_count": len(os_bad_ids) - len(pending_ids),
+        "baseline_verification_complete": len(pending_ids) == 0,
+        "baseline_pending_count": len(pending_ids),
+        "baseline_pending_token_ids": pending_ids[:200],
         "baseline_mismatch_count": len(baseline_mismatch_ids),
         "baseline_mismatch_token_ids": baseline_mismatch_ids,
         "baseline_checked_this_run": checked_this_run,
@@ -310,16 +374,10 @@ def main():
         "currently_listed_mismatches": listed_mismatches,
     }
 
-    old_state = STATE_FILE.read_text() if STATE_FILE.exists() else None
-    old_out = OUT.read_text() if OUT.exists() else None
-    new_state = json.dumps(state, indent=2, sort_keys=True) + "\n"
-    new_out = json.dumps(result, indent=2, sort_keys=True) + "\n"
-
-    STATE_FILE.write_text(new_state)
-    OUT.write_text(new_out)
-    print(new_out)
-
-    return 2 if old_state != new_state or old_out != new_out else 0
+    STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+    OUT.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
