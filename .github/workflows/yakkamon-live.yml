@@ -1,13 +1,13 @@
 name: Yakkamon live watcher
 
 on:
-  push:
-    paths:
-      - ".github/workflows/yakkamon-live.yml"
-      - "automation/yakkamon-watcher/**"
   workflow_dispatch:
   schedule:
     - cron: "*/30 * * * *"
+
+concurrency:
+  group: yakkamon-live-watcher
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -15,6 +15,7 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
