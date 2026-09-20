@@ -9,17 +9,49 @@ OPENSEA_SLUG = "yakkamon-590038504"
 CONTRACT = "0x6d1bc5247ca99d917d91ec52dbbb5ef6c2435107".lower()
 RONIN_RPC = os.getenv("RONIN_RPC", "https://api.roninchain.com/rpc")
 OUT = Path(__file__).with_name("mismatches.json")
+KEY_FILE = Path(__file__).with_name(".opensea_key")
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "yakkamon-mismatch-watcher/1.0"})
 TIMEOUT = 25
 
+def _retry_after(resp, default=30):
+    try:
+        return max(1, int(float(resp.headers.get("Retry-After", default))))
+    except Exception:
+        return default
+
 def get_opensea_key():
-    r = SESSION.post("https://api.opensea.io/api/v2/auth/keys", timeout=TIMEOUT)
-    r.raise_for_status()
-    key = r.json().get("api_key")
-    if not key:
-        raise RuntimeError("OpenSea did not return an api_key")
-    return key
+    env_key = os.getenv("OPENSEA_API_KEY")
+    if env_key:
+        return env_key.strip()
+
+    if KEY_FILE.exists():
+        cached = KEY_FILE.read_text().strip()
+        if cached:
+            return cached
+
+    url = "https://api.opensea.io/api/v2/auth/keys"
+    last = None
+    for attempt in range(8):
+        r = SESSION.post(url, timeout=TIMEOUT)
+        if r.status_code == 201:
+            key = r.json().get("api_key")
+            if not key:
+                raise RuntimeError("OpenSea created a key but returned no api_key")
+            KEY_FILE.write_text(key)
+            try:
+                os.chmod(KEY_FILE, 0o600)
+            except Exception:
+                pass
+            return key
+        if r.status_code == 429:
+            wait = _retry_after(r, min(60 * (attempt + 1), 300))
+            print(f"OpenSea key creation rate-limited; waiting {wait}s", flush=True)
+            time.sleep(wait)
+            last = f"429 after waiting {wait}s"
+            continue
+        r.raise_for_status()
+    raise RuntimeError(f"Could not obtain OpenSea API key: {last}")
 
 def fetch_bad_egg_listings(api_key):
     url = f"https://api.opensea.io/api/v2/listings/collection/{OPENSEA_SLUG}/best"
@@ -106,9 +138,19 @@ def rpc_token_uri(token_id):
     arg = hex(int(token_id))[2:].rjust(64, "0")
     payload = {"jsonrpc":"2.0","id":1,"method":"eth_call",
                "params":[{"to":CONTRACT,"data":"0x"+selector+arg},"latest"]}
-    r = SESSION.post(RONIN_RPC, json=payload, timeout=TIMEOUT)
-    r.raise_for_status()
-    result = r.json().get("result")
+    last = None
+    for attempt in range(7):
+        r = SESSION.post(RONIN_RPC, json=payload, timeout=TIMEOUT)
+        if r.status_code == 429:
+            wait = _retry_after(r, min(2 ** attempt, 20))
+            time.sleep(wait)
+            last = f"429 after {wait}s"
+            continue
+        r.raise_for_status()
+        result = r.json().get("result")
+        break
+    else:
+        raise RuntimeError(f"Ronin RPC rate limit persisted: {last}")
     if not result or result == "0x":
         raise RuntimeError(f"empty tokenURI result for #{token_id}")
     b = bytes.fromhex(result[2:])
@@ -184,8 +226,8 @@ def main():
                 })
         except Exception as e:
             verification_errors.append({"token_id": tid, "error": str(e)[:300]})
-        if i and i % 50 == 0:
-            time.sleep(0.2)
+        # Public Ronin RPC is rate-limited; pace calls so every token is verified.
+        time.sleep(0.35)
 
     result = {
         "collection": "Yakkamon",
@@ -194,6 +236,8 @@ def main():
         "opensea_bad_egg_active_listing_rows": len(listings),
         "unique_tokens_checked": len(by_token),
         "unparsed_listing_rows": unparsed,
+        "verified_token_count": len(by_token) - len(verification_errors),
+        "verification_complete": len(verification_errors) == 0,
         "verification_error_count": len(verification_errors),
         "verification_errors": verification_errors[:50],
         "mismatch_count": len(mismatches),
