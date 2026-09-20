@@ -3,5 +3,211 @@
   "contract": "0x6d1bc5247ca99d917d91ec52dbbb5ef6c2435107",
   "mismatch_count": 0,
   "mismatches": [],
-  "note": "Initial placeholder; GitHub Action replaces this after the first scan."
+  "opensea_bad_egg_active_listing_rows": 191,
+  "rule": "Active OpenSea listing is tagged Bad Egg, but live Ronin token metadata is not Bad Egg",
+  "unique_tokens_checked": 168,
+  "unparsed_listing_rows": 0,
+  "verification_error_count": 68,
+  "verification_errors": [
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "6970"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7011"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7012"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7013"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7152"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7155"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7190"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7191"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7314"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7605"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7777"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "7889"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8000"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8124"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8138"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8327"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8562"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8712"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8721"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8822"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8860"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8960"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "8989"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9178"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9218"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9251"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9263"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9276"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9287"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9313"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9321"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9388"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9395"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9458"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9480"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9524"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9559"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9570"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9589"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9608"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9715"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9721"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9760"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9763"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9764"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9766"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9773"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9799"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9821"
+    },
+    {
+      "error": "429 Client Error: Too Many Requests for url: https://api.roninchain.com/rpc",
+      "token_id": "9839"
+    }
+  ]
 }
