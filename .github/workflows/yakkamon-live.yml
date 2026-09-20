@@ -1,0 +1,40 @@
+name: Yakkamon live watcher
+
+on:
+  push:
+    paths:
+      - ".github/workflows/yakkamon-live.yml"
+      - "automation/yakkamon-watcher/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Scan Yakkamon
+        run: |
+          python automation/yakkamon-watcher/watcher.py || code=$?
+          code=${code:-0}
+          if [ "$code" -eq 2 ]; then exit 0; fi
+          exit "$code"
+      - name: Commit result
+        run: |
+          if git diff --quiet -- automation/yakkamon-watcher/mismatches.json; then
+            echo "No result change"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add automation/yakkamon-watcher/mismatches.json
+          git commit -m "Update Yakkamon mismatch results"
+          git push
