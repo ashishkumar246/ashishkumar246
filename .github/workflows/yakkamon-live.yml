@@ -1,6 +1,10 @@
 name: Yakkamon live watcher
 
 on:
+  push:
+    paths:
+      - ".github/workflows/yakkamon-live.yml"
+      - "automation/yakkamon-watcher/watcher.py"
   workflow_dispatch:
   schedule:
     - cron: "*/30 * * * *"
