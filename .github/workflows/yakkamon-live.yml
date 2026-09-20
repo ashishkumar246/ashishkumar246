@@ -29,12 +29,12 @@ jobs:
           exit "$code"
       - name: Commit result
         run: |
-          if git diff --quiet -- automation/yakkamon-watcher/mismatches.json; then
+          if git diff --quiet -- automation/yakkamon-watcher/mismatches.json automation/yakkamon-watcher/scan_state.json; then
             echo "No result change"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add automation/yakkamon-watcher/mismatches.json
+          git add automation/yakkamon-watcher/mismatches.json automation/yakkamon-watcher/scan_state.json
           git commit -m "Update Yakkamon mismatch results"
           git push
